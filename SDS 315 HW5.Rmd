@@ -1,0 +1,157 @@
+---
+title: "SDS 315 HW5"
+author: "Preston Bui"
+date: "2024-02-28"
+output: html_document
+---
+
+
+EID: ppb434
+
+Github Repo: []()
+
+```{r message = FALSE, echo = FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyverse)
+library(broom)
+library(kableExtra)
+library(stats)
+```
+
+# **Problem 1**
+
+**Null Hypothesis:** The null hypothesis is that the Iron Bank's trades are flagged at the same 2.4% baseline rate as other traders.
+
+
+**Test Statistic:** The test statistic is the number of flagged trades out of 2021 total trades.
+
+
+### **Monte Carlo Simulation**
+
+```{r echo = FALSE}
+total_trades <- 2021
+flagged_trades_observed <- 70
+baseline_rate <- 0.024
+num_simulations <- 100000
+
+simulated_flagged <- rbinom(n = num_simulations, size = total_trades, prob = baseline_rate)
+
+hist(simulated_flagged, breaks = 50, main = "Distribution of Flagged Trades Under Null Hypothesis",
+     xlab = "Number of Flagged Trades", ylab = "Frequency", border = "blue", col = "lightblue")
+abline(v = flagged_trades_observed, col = "red", lwd = 2)
+
+```
+
+### **P-Value Calculation**
+```{r echo = FALSE}
+p_value <- mean(simulated_flagged >= flagged_trades_observed)
+```
+
+The p-value calculated from the Monte Carlo simulation is `r p_value`.
+
+
+**Conclusion:** With a p-value of `r p_value`, there is strong evidence against the null hypothesis. This suggests that the number of flagged trades from the Iron Bank is significantly higher than what we would expect based on the baseline flag rate of 2.4%. Therefore, the null hypothesis that Iron Bank trades are flagged at the baseline rate does not look plausible in light of the data.
+
+
+# **Problem 2**
+
+**Null Hypothesis:** The null hypothesis (H0) is that Gourmet Bites' rate of health code violations is 3%, consistent with the citywide average for restaurant inspections.
+
+**Test Statistic:** The test statistic is the number of health code violations in the simulation that meets or exceeds the observed number of violations (8 out of 50 inspections).
+
+
+### **Monte Carlo Simulation**
+
+```{r echo = FALSE}
+n_simulations <- 100000
+n_inspections <- 50
+observed_violations <- 8
+citywide_average <- 0.03
+
+simulated_violations <- rbinom(n_simulations, n_inspections, citywide_average)
+
+hist(simulated_violations, breaks=50, main="Distribution of Violations Under Null Hypothesis",
+     xlab="Number of Violations", border="blue", col="lightblue",
+     xlim=c(min(simulated_violations), max(simulated_violations)))
+
+p_value_gourmet <- mean(simulated_violations >= observed_violations)
+```
+
+### **P-Value Calculation**
+
+The p-value calculated from the Monte Carlo simulation is `r p_value_gourmet`.
+
+**Conclusion:** With a p-value of `r p_value_gourmet`, there is very strong evidence against the null hypothesis. This suggests that the rate of health code violations at Gourmet Bites is significantly higher than the citywide average of 3%. Therefore, it seems unlikely that the observed rate of violations at Gourmet Bites is due to random chance alone, and the Health Department may have a justified cause for further investigation or action based on this evidence.
+
+
+# **Problem 3**
+
+## Part A: The Null or Reference Distribution
+
+```{r echo = FALSE}
+letter_frequencies = read.csv("~/Downloads/letter_frequencies.csv")
+brown = read.table("/Users/prestonbui/Downloads/brown_sentences.txt", sep = "\t")
+
+brown$chi = NA
+
+chi_square = function(sentence, freq_table) {
+  
+  clean_sentence = gsub("[^A-Za-z]", "", sentence)
+  clean_sentence = toupper(clean_sentence)
+  
+  observed_counts = table(factor(strsplit(clean_sentence, "")[[1]], levels = freq_table$Letter))
+  
+  total_letters = sum(observed_counts)
+  expected_counts = total_letters * freq_table$Probability
+  chi_squared_stat = sum((observed_counts - expected_counts)^2 / expected_counts)
+
+  return(chi_squared_stat)
+}
+
+for(x in 1:nrow(brown)) {
+  brown$chi[x] = chi_square(brown$V1[x], letter_frequencies)
+  
+}
+
+ggplot(brown, aes(x = chi)) +
+  geom_histogram(binwidth = 1, fill = "lightblue") +
+  labs(title = "Histogram of Chi-Squared Statistics",
+       x = "Chi-Squared Value",
+       y = "Count") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+## Part B: Checking for a Watermark
+
+```{r echo = FALSE}
+sentences <- c(
+  "She opened the book and started to read the first chapter, eagerly anticipating what might come next.",
+  "Despite the heavy rain, they decided to go for a long walk in the park, crossing the main avenue by the fountain in the center.",
+  "The museum’s new exhibit features ancient artifacts from various civilizations around the world.",
+  "He carefully examined the document, looking for any clues that might help solve the mystery.",
+  "The students gathered in the auditorium to listen to the guest speaker’s inspiring lecture.",
+  "Feeling vexed after an arduous and zany day at work, she hoped for a peaceful and quiet evening at home, cozying up after a quick dinner with some TV, or maybe a book on her upcoming visit to Auckland.",
+  "The chef demonstrated how to prepare a delicious meal using only locally sourced ingredients, focusing mainly on some excellent dinner recipes from Spain.",
+  "They watched the sunset from the hilltop, marveling at the beautiful array of colors in the sky.",
+  "The committee reviewed the proposal and provided many points of useful feedback to improve the project’s effectiveness.",
+  "Despite the challenges faced during the project, the team worked tirelessly to ensure its successful completion, resulting in a product that exceeded everyone’s expectations."
+)
+
+chi_sq_test_stats <- sapply(sentences, function(sentence) {
+  chi_square(sentence, letter_frequencies)
+})
+
+p_values <- sapply(chi_sq_test_stats, function(chi_stat) {
+  mean(brown$chi >= chi_stat)
+})
+
+results_df <- data.frame(Sentence = 1:length(sentences), Chi_Squared_Statistic = chi_sq_test_stats, P_Value = p_values)
+
+kable(results_df, caption = "Chi-Squared Statistics and P-Values", digits = 3, format = "html", align = 'c') %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+
+```
+
+Based on the chi-squared statistics and p-values presented, sentence 6 exhibits a notably lower p-value compared to the others, suggesting a significant deviation from the expected letter distribution of standard English text. This deviation indicates that sentence 6 is likely the one adjusted by an LLM to include a watermark, as it stands out statistically from the rest of the sentences analyzed.
